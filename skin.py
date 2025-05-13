@@ -13,7 +13,7 @@ except ImportError as e:
     st.stop()
 
 # App title
-st.title("YOLOv8 Model Demo")
+st.title("Skin Cancer Classification Demo")
 
 # File uploader allows only image types
 uploaded_file = st.file_uploader(
