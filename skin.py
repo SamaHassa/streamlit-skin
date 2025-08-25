@@ -3,44 +3,51 @@ from PIL import Image
 import numpy as np
 from ultralytics import YOLO
 
-# Load the YOLOv8 model (best_skin.pt)
-try:
-    model = YOLO('best_skin.pt')  # replace with your model path if different
-except ImportError as e:
-    st.error(
-        "Failed to import YOLO. Make sure `ultralytics` and `opencv-python-headless` are installed."
-    )
-    st.stop()
+# ---------------------------
+# Load the YOLOv8 model
+# ---------------------------
+@st.cache_resource  # cache model so it doesn’t reload every time
+def load_model():
+    try:
+        model = YOLO("best_skin.pt")  # make sure this file is in the same folder
+        return model
+    except Exception as e:
+        st.error(f"❌ Failed to load model: {e}")
+        st.stop()
 
-# App title
-st.title("Skin Cancer Classification Demo")
+model = load_model()
 
-# File uploader allows only image types
-uploaded_file = st.file_uploader(
-    "Upload an image", type=['jpg', 'jpeg', 'png']
-)
+# ---------------------------
+# Streamlit App
+# ---------------------------
+st.title("🩺 Skin Cancer Classification Demo")
+st.write("Upload a dermoscopy image and the model will predict the cancer type.")
+
+# File uploader
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    # Open the image with PIL
-    image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, caption='Uploaded Image', use_container_width=True)
-    st.write("Running inference...")
+    # Open and show the uploaded image
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="Uploaded Image", use_container_width=True)
+    st.write("🔍 Running inference...")
 
-    # Perform inference
-    results = model.predict(source=np.array(image))
+    # Run prediction
+    results = model(np.array(image))  # inference
     result = results[0]
 
-    # If classification probabilities are returned, show top-1 class
+    # Check if classification output exists
     if result.probs is not None:
         top_idx = result.probs.top1
         class_name = result.names[top_idx]
-        confidence = result.probs.top1conf
-        st.success(f"**Classification:** {class_name} ({confidence * 100:.2f}%)")
-    # Otherwise, treat as detection: draw boxes
-    elif hasattr(result, 'boxes') and result.boxes:
-        annotated = result.plot()
-        st.image(annotated, caption='Detections', use_container_width=True)
+        confidence = float(result.probs.top1conf)
+
+        st.success(f"**Prediction:** {class_name} ({confidence * 100:.2f}%)")
+
+        # Optionally show top-5 predictions
+        st.subheader("Top-5 Predictions")
+        for idx in result.probs.top5:
+            st.write(f"- {result.names[idx]}: {result.probs.data[idx].item() * 100:.2f}%")
+
     else:
-        st.error(
-            "No valid output returned. Please ensure your `best_skin.pt` is a valid YOLOv8 classification or detection model."
-        )
+        st.error("⚠️ This model does not return classification results. Please check if `best_skin.pt` is a classification model.")
